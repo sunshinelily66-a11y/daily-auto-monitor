@@ -1,0 +1,114 @@
+# Daily Auto Industry Monitor
+
+This project runs on GitHub Actions every day and builds a two-layer automotive intelligence workflow:
+
+1. Source collection
+2. Analysis and structuring
+
+## Current source groups
+
+The collection layer is aligned to the four source buckets you confirmed:
+
+1. News aggregators
+2. Official brand newsrooms and websites
+3. Industry media
+4. Sales bulletin sources
+
+The source settings live in `config/monitor_config.json`.
+The official-source group also includes an expanded set of brand-owned domains for mainstream China EV brands and key benchmark automakers.
+
+## Brand coverage
+
+The default watchlist now focuses on mainstream China EV brands plus a small set of traditional benchmark brands.
+
+China EV-focused brands currently include:
+
+- BYD
+- Tesla
+- Xiaomi Auto
+- NIO
+- XPeng
+- Leapmotor
+- ZEEKR
+- Li Auto
+- AITO
+- Luxeed
+- Stelato
+- AVATR
+- VOYAH
+- Deepal
+- ARCFOX
+- Denza
+- Fang Cheng Bao
+- AION
+- Geely Galaxy
+- Ora
+
+Benchmark legacy brands currently include:
+
+- Toyota
+- Volkswagen
+- BMW
+- Mercedes-Benz
+- Audi
+- Nissan
+- Honda
+- Buick
+
+## Analysis categories
+
+After collection, the script organizes the results into four business categories:
+
+1. New vehicle launches
+2. Market sales, including star models and monthly, annual, or half-year sales
+3. Important marketing developments
+4. Public opinion monitoring
+
+If `DEEPSEEK_API_KEY` is configured, the script sends the collected items to DeepSeek for classification and summary.
+
+If the key is missing, the script falls back to a local keyword-based classifier so the workflow can still run.
+
+## Output files
+
+Each run writes to `outputs/auto-monitor/YYYY-MM-DD/`:
+
+- `raw_items.json`: raw collected items
+- `analysis.json`: structured analysis result
+- `report.md`: human-readable daily report
+
+## GitHub setup
+
+Add these repository secrets if you want DeepSeek-powered analysis:
+
+- `DEEPSEEK_API_KEY`
+- `DEEPSEEK_BASE_URL` (optional, default is `https://api.deepseek.com`)
+- `DEEPSEEK_MODEL` (optional, default is `deepseek-chat`)
+
+Add these repository secrets if you want Feishu group notifications through a custom bot:
+
+- `FEISHU_BOT_WEBHOOK`
+- `FEISHU_BOT_SECRET` (optional, only needed if your bot enables signature verification)
+
+The workflow runs daily at about 09:30 Beijing time:
+
+```yaml
+schedule:
+  - cron: "30 1 * * *"
+```
+
+## How the pipeline works
+
+1. GitHub Actions starts the workflow.
+2. The script reads source and analysis settings from `config/monitor_config.json`.
+3. It queries Google News RSS using keyword and domain combinations for each source group.
+4. It cleans, deduplicates, and normalizes the raw items.
+5. It sends the normalized items to DeepSeek for analysis, or uses local fallback logic.
+6. It writes raw data, structured analysis, and a daily Markdown report.
+7. If a Feishu bot webhook is configured, it sends a short summary to the group.
+
+## Good next upgrades
+
+- Replace Google News-only collection with direct scraping for selected official sites
+- Add WeChat, Xiaohongshu, and video-platform monitoring if you have compliant access paths
+- Push the final report to Feishu, email, Slack, or Teams
+- Add a watchlist for competitor pricing, safety complaints, and recall signals
