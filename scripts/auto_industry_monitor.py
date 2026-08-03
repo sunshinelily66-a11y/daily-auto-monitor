@@ -21,6 +21,7 @@ import requests
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "config" / "monitor_config.json"
 OUTPUT_DIR = ROOT / "outputs" / "auto-monitor"
+WORK_DIR = ROOT / "work"
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -283,9 +284,37 @@ def call_deepseek(config: dict[str, Any], raw_items: list[RawItem]) -> dict[str,
     )
     response.raise_for_status()
     content = response.json()["choices"][0]["message"]["content"]
-    data = json.loads(content)
+    data = parse_llm_json(content)
     data["generated_by"] = model
     return data
+
+
+def parse_llm_json(content: str) -> dict[str, Any]:
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        pass
+
+    fenced_match = re.search(r"```(?:json)?\s*(\{.*\})\s*```", content, re.DOTALL)
+    if fenced_match:
+        try:
+            return json.loads(fenced_match.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    start = content.find("{")
+    end = content.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        candidate = content[start : end + 1]
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+
+    WORK_DIR.mkdir(parents=True, exist_ok=True)
+    error_dump_path = WORK_DIR / "deepseek-invalid-response.txt"
+    error_dump_path.write_text(content, encoding="utf-8")
+    raise json.JSONDecodeError("Unable to parse LLM response as JSON", content, 0)
 
 
 def build_markdown_report(config: dict[str, Any], analysis: dict[str, Any], generated_at: str) -> str:
