@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import json
 import os
 import re
 import sys
 import time
-import hmac
-import base64
-import hashlib
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -238,8 +238,10 @@ def build_deepseek_prompt(config: dict[str, Any], raw_items: list[RawItem]) -> s
         '"categories":[{"name":"...", "takeaways":["..."], '
         '"items":[{"title":"...", "url":"...", "source":"...", "published":"...", '
         '"brand":"...", "source_group":"...", "reason":"...", "summary":"..."}]}]}. '
+        "Each item summary should be around 80 to 120 Chinese characters and explain the key fact clearly. "
         "For market sales, explicitly call out star models and monthly, annual, or half-year sales mentions when present. "
         "For public opinion monitoring, prioritize controversy, complaints, safety, pricing, and regulatory attention. "
+        "Keep the original source URL for each item. "
         "Input items JSON: "
         f"{json.dumps(payload, ensure_ascii=False)}"
     )
@@ -358,17 +360,43 @@ def write_outputs(config: dict[str, Any], raw_items: list[RawItem], analysis: di
     return raw_path, analysis_path, report_path
 
 
+def shorten_text(text: str, target: int = 110) -> str:
+    cleaned = re.sub(r"\s+", " ", (text or "")).strip()
+    if not cleaned:
+        return ""
+    if len(cleaned) <= target:
+        return cleaned
+    return cleaned[: target - 1].rstrip() + "…"
+
+
 def build_feishu_text(analysis: dict[str, Any]) -> str:
-    lines = ["汽车行业监控日报已生成"]
+    lines = ["汽车行业监控日报", ""]
 
     for point in analysis.get("executive_summary", [])[:3]:
-        lines.append(f"- {point}")
+        lines.append(f"摘要：{point}")
 
     for category in analysis.get("categories", [])[:4]:
-        item_count = len(category.get("items", []))
-        lines.append(f"- {category.get('name', '未命名分类')}: {item_count} 条")
+        category_name = category.get("name", "未命名分类")
+        items = category.get("items", [])
+        lines.extend(["", f"【{category_name}】共 {len(items)} 条"])
 
-    return "\n".join(lines)
+        if not items:
+            lines.append("暂无相关内容")
+            continue
+
+        for index, item in enumerate(items, start=1):
+            title = item.get("title", "未命名资讯")
+            summary = shorten_text(item.get("summary") or item.get("reason") or "暂无概述")
+            url = item.get("url", "")
+            lines.append(f"{index}. {title}")
+            lines.append(f"概述：{summary}")
+            if url:
+                lines.append(f"链接：{url}")
+            if item.get("source"):
+                lines.append(f"来源：{item['source']}")
+            lines.append("")
+
+    return "\n".join(lines).strip()
 
 
 def build_feishu_sign(secret: str, timestamp: str) -> str:
