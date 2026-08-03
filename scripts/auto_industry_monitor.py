@@ -463,14 +463,18 @@ def main() -> int:
     config = load_config()
     try:
         raw_items = collect_raw_items(config)
-        analysis = call_deepseek(config, raw_items) or fallback_analysis(config, raw_items)
+        try:
+            analysis = call_deepseek(config, raw_items) or fallback_analysis(config, raw_items)
+        except json.JSONDecodeError as exc:
+            print(
+                f"DeepSeek response was not valid JSON, falling back to local classification: {exc}",
+                file=sys.stderr,
+            )
+            analysis = fallback_analysis(config, raw_items)
         raw_path, analysis_path, report_path = write_outputs(config, raw_items, analysis)
         send_feishu_message(analysis)
     except requests.RequestException as exc:
         print(f"Network request failed: {exc}", file=sys.stderr)
-        return 1
-    except json.JSONDecodeError as exc:
-        print(f"DeepSeek response was not valid JSON: {exc}", file=sys.stderr)
         return 1
 
     print(f"Raw data written to: {raw_path}")
