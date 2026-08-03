@@ -250,8 +250,8 @@ def call_deepseek(config: dict[str, Any], raw_items: list[RawItem]) -> dict[str,
     if not api_key:
         return None
 
-    base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
-    model = os.getenv("DEEPSEEK_MODEL", config.get("deepseek_model", "deepseek-chat"))
+    base_url = (os.getenv("DEEPSEEK_BASE_URL") or "https://api.deepseek.com").rstrip("/")
+    model = os.getenv("DEEPSEEK_MODEL") or config.get("deepseek_model", "deepseek-chat")
     prompt = build_deepseek_prompt(config, raw_items)
     payload = {
         "model": model,
